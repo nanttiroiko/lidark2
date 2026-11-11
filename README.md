@@ -1,6 +1,6 @@
-# lidark
+# lidark^2
 
-lidark detects archaeological features (such as tar production kilns) from
+lidark^2 detects archaeological features (such as tar production kilns) from
 airborne laser scanning data using a deep learning pipeline. It is the
 modernized implementation of the original
 [LIDARK](old_code/) script: LiDAR point clouds are processed into elevation
