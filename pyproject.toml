@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lidark"
+version = "0.1.0"
+description = "LiDAR-based detection of archaeological features with deep learning (modernized LIDARK)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Finnish Heritage Agency (Museovirasto)" }]
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "rasterio>=1.3",
+    "scipy>=1.12",
+    "pyogrio>=0.8",
+    "tqdm>=4.66",
+    "torch>=2.2",
+    "pdal>=2.6",
+    "gdal-utils>=3.8",
+]
+
+[project.optional-dependencies]
+# torchvision: detection and instance-segmentation backends (fasterrcnn,
+# maskrcnn); torch itself is a core dependency (U-Net, GPU-accelerated TPI).
+torch = ["torchvision>=0.17"]
+# dev tooling
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+# future backend extras (added with their backends):
+# yolo = ["ultralytics"]
+# detectron2 = ["detectron2"]
+
+[project.scripts]
+lidark = "lidark.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "SIM", # simplify
+]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+# Geospatial/data libs ship few or no type stubs.
+module = [
+    "rasterio.*",
+    "geopandas.*",
+    "shapely.*",
+    "pyogrio.*",
+    "scipy.*",
+    "tqdm.*",
+    "laspy.*",
+    "pdal.*",
+    "torch.*",
+    "torchvision.*",
+    "affine.*",
+    "pandas.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    # Opt-in tests using the real LiDAR sample in test_data/laz (skipped when
+    # absent). Synthetic data remains the default for all other tests.
+    "realdata: uses real LiDAR samples from test_data/laz",
+]
