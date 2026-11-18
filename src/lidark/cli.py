@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--buffer",
         type=float,
         default=None,
-        help="DTM: point-read margin in m (default 2). TPI: radius in m (default 30)",
+        help="DTM: point-read margin in m (default 2). TPI: radius in m (default 8)",
     )
     create.add_argument("--pixel-size", type=float, default=0.25, help="raster resolution (m/px)")
     create.add_argument("--cores", type=int, default=8, help="worker processes for tile pipelines")
@@ -81,12 +81,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     common(train_parser)
     train_parser.add_argument(
-        "--area", nargs="+", required=True, metavar="AREA", help="project areas"
+        "--area",
+        "--areas",
+        nargs="+",
+        required=True,
+        metavar="AREA",
+        help="project areas (--areas accepted as an alias)",
     )
     train_parser.add_argument(
         "--name",
         required=True,
-        help="model name; the model id becomes <name>_<timestamp>",
+        help="run name; the model id becomes <name>_<timestamp> and a dataset "
+        "created in the same run gets the same id under DeepLearning/samples/",
     )
     train_parser.add_argument("--true-objects", help="true-object shapefile name")
     train_parser.add_argument("--false-objects", help="false-object shapefile name")

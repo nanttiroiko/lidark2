@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 MAP_TYPES = ("DTM", "TPI")
-DEFAULT_TPI_RADIUS = 30.0
+DEFAULT_TPI_RADIUS = 8.0
 
 
 def create_map(
@@ -38,7 +38,7 @@ def create_map(
         map_type: ``"DTM"`` or ``"TPI"``. For DTM, ``buffer`` is the point-read
             margin in metres used when reading neighbouring LAZ tiles
             (default 2.0). For TPI, ``buffer`` is the TPI radius in metres
-            (default 30.0; output folder ``02_TPI/radius_<buffer>/``).
+            (default 8.0; output folder ``02_TPI/radius_<buffer>/``).
         buffer: Product buffer/radius in metres; ``None`` selects the
             per-product default.
         pixel_size: Raster resolution in metres per pixel.

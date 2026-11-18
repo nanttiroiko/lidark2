@@ -1,4 +1,4 @@
-"""Faster R-CNN object detection backend (torchvision, via ``lidark[torch]``).
+"""Faster R-CNN object detection backend (torchvision, a core dependency).
 
 Implements the :class:`~lidark.models.base.ModelBackend` protocol with
 ``task = instance_detection``. The model is torchvision's
@@ -345,6 +345,9 @@ class FasterRcnnBackend:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         state = torch.load(weights, map_location=device, weights_only=True)
         self._model.load_state_dict(state)
+        # load_state_dict keeps the parameters on their current device; move
+        # the model explicitly, otherwise predict_instances runs on CPU.
+        self._model = self._model.to(device)
 
 
 # ------------------------------------------------------------------- helpers
@@ -398,6 +401,8 @@ def _batch_to_torch(
                 if float(torch.rand(1)) > 0.5:
                     window = np.flip(window, axis=axis)
                     label = np.flip(label, axis=axis)
+        # np.flip above returns a negative-stride view; torch.as_tensor rejects those.
+        window = np.ascontiguousarray(window)
         images.append(torch.as_tensor(window, device=device).permute(2, 0, 1))
         targets.append(_targets_for_label(np.ascontiguousarray(label), device))
     return images, targets

@@ -61,7 +61,7 @@ def _fasterrcnn_factory() -> ModelBackend:
 # The default backend; its torch import stays inside the factory.
 register("unet", _unet_factory)
 # Instance segmentation (torchvision); the torch import stays inside the
-# factory, so listing backends works without lidark[torch] installed.
+# factory, so listing backends never imports the framework.
 register("maskrcnn", _maskrcnn_factory)
 # Object detection (torchvision); same lazy-import guarantee.
 register("fasterrcnn", _fasterrcnn_factory)
