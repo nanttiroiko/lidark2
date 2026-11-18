@@ -14,10 +14,12 @@ Detection IR accumulates in memory - per-tile GeoPackages only on request
 Instance backends (Mask R-CNN, Faster R-CNN) take the **sparse path**: no
 score rasters or stitching - each window's instances/detections are
 converted straight into the Detection IR (masks polygonized in window
-coordinates, so the sliding-window duplicates resolve in the area merge;
-Faster R-CNN's boxes arrive as box-footprint masks and polygonize into
-the box rectangles), and the per-tile raster output becomes the class-id
-footprint of the predicted instances.
+coordinates; Faster R-CNN's boxes arrive as box-footprint masks and
+polygonize into the box rectangles), and the per-tile raster output becomes
+the class-id footprint of the predicted instances. For these backends the
+area-level ``merge_overlapping`` dissolve is skipped: every instance/box
+stays an individual row, so overlapping detections (e.g. the same object
+seen in overlapping windows) are not merged.
 """
 
 from __future__ import annotations
@@ -238,7 +240,14 @@ def _predict_area(
             detections.append(tile_ir)
 
     if detections:
-        merged = merge_overlapping(gpd.GeoDataFrame(pd.concat(detections, ignore_index=True)))
+        combined = gpd.GeoDataFrame(pd.concat(detections, ignore_index=True))
+        if backend.task in (TASK_INSTANCE_SEGMENTATION, TASK_INSTANCE_DETECTION):
+            # Sparse path: one row per instance/box - overlapping detections
+            # stay individual; only the dense path dissolves same-class
+            # overlaps.
+            merged = combined
+        else:
+            merged = merge_overlapping(combined)
     else:
         merged = empty_detections(layout.epsg)
     merged_path = layout.predictions_dir(model_id, area) / f"merged_shapes_{pred_type}.gpkg"
@@ -359,9 +368,9 @@ def _predict_tile_instances(
     Each window's instance masks are polygonized in window coordinates
     (window transform = tile transform shifted to the window origin), so
     the geometries land in the tile's CRS directly. The per-tile raster
-    output is the class-id footprint of the predicted instances; the
-    sliding-window duplicates of one object overlap almost fully and
-    dissolve in the area-level IR merge.
+    output is the class-id footprint of the predicted instances. The
+    area-level merge skips the overlap dissolve for this path, so
+    sliding-window duplicates of one object stay individual rows.
     """
     height, width = stack.shape[0], stack.shape[1]
     crs_obj: CRS | str | None = crs if crs is not None else layout.epsg

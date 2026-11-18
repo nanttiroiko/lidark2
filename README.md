@@ -1,6 +1,6 @@
 # LIDARK2
 
-lidark detects archaeological features (such as tar production kilns) from
+LIDARK2 detects archaeological features (such as tar production kilns) from
 airborne laser scanning data using a deep learning pipeline. It is the
 modernized implementation of the original
 [LIDARK](https://github.com/finnish-heritage-agency/LIDARK_U-NET) script: LiDAR point clouds are processed into elevation
@@ -9,14 +9,14 @@ trained models produce georeferenced detection polygons.
 
 ## Setup
 
-lidark trains and predicts on the GPU with PyTorch, so start by
+LIDARK2 trains and predicts on the GPU with PyTorch, so start by
 installing the NVIDIA driver for your GPU - `nvidia-smi` must run before
 you continue. On WSL2, install the driver on Windows only - do **not**
 install a driver inside WSL.
 
 ### Choosing one installation route
 
-lidark combines two binary (compiled) stacks: the LiDAR/geospatial stack
+LIDARK2 combines two binary (compiled) stacks: the LiDAR/geospatial stack
 (GDAL, PDAL, rasterio, geopandas) and the PyTorch stack. conda-forge
 packages and pip wheels each bundle their own low-level runtimes
 (OpenMP, BLAS, CUDA), and mixing the two in one environment loads
@@ -43,7 +43,7 @@ pip install -e . --no-deps
 python -c "import torch; print(torch.cuda.is_available())"
 ```
 
-pip is used only for the pure-python lidark package itself: the
+pip is used only for the pure-python LIDARK2 package itself: the
 `--no-deps` flag is important, because it stops pip from pulling any
 binary dependency as a wheel - a pip torch wheel next to the conda
 stack is exactly the mixing this route avoids. `gdalbuildvrt` comes
@@ -61,10 +61,10 @@ Notes:
   (RTX 50xx, compute capability 12.0), check that the resolved build contains `sm_120`
   kernels - a build without them fails at the first GPU op with
   `cudaErrorNoKernelImageForDevice`.
-- lidark sets `KMP_DUPLICATE_LIB_OK=TRUE` itself (in
+- LIDARK2 sets `KMP_DUPLICATE_LIB_OK=TRUE` itself (in
   `lidark/__init__.py`), so a residual OpenMP duplicate is tolerated
   instead of aborting.
-- Always run lidark and pytest from an activated environment
+- Always run LIDARK2 and pytest from an activated environment
   (`conda activate lidark`). The conda-forge numpy in this stack
   delay-loads its BLAS runtime from the environment's `Library\bin`,
   which is only on the DLL search path in an activated env; calling the
@@ -87,7 +87,7 @@ Notes:
 
   - and the full ML env from the command above (with `pytorch-gpu
   torchvision`) for `train`, `predict`, and `evaluate` - plus TPI with
-  `--gpu`, which imports torch. Both envs get the lidark package itself
+  `--gpu`, which imports torch. Both envs get the LIDARK2 package itself
   via `pip install -e . --no-deps`; activate `lidark-maps` for
   `create-map` and the ML env for everything else. Keeping each conda
   solve small and fast makes setting up the environments easier.
@@ -101,7 +101,7 @@ distribution) - the PDAL and GDAL Python packages compile against them:
 sudo apt install gdal-bin libgdal-dev libpdal-dev
 ```
 
-Then create the environment and install lidark:
+Then create the environment and install LIDARK2:
 
 ```console
 python3.11 -m venv .venv
@@ -130,7 +130,7 @@ Notes:
   use a `cu128`-or-newer index instead - the `cu126` builds have no
   `sm_120` kernels and every GPU op fails with
   `cudaErrorNoKernelImageForDevice`.
-- `gdal-utils` (installed with lidark) provides the `gdalbuildvrt`
+- `gdal-utils` (installed with LIDARK2) provides the `gdalbuildvrt`
   command the VRT mosaics are built with; it needs the GDAL Python
   bindings, so also run `pip install gdal` (it compiles against the
   `libgdal-dev` installed above). Without a working `gdalbuildvrt`,
