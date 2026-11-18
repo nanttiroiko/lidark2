@@ -86,7 +86,10 @@ def train(
     The model id is the **user-supplied name plus the timestamp**
     (``<name>_<YYYYMMDD-HHMMSS>``), naming
     ``DeepLearning/model/<name>_<timestamp>/`` and the log file — the name
-    makes models memorable, the timestamp keeps them unique.
+    makes models memorable, the timestamp keeps them unique. A dataset
+    created in the same run gets the **same id**
+    (``DeepLearning/samples/<name>_<timestamp>/``), so a model and the
+    dataset it was trained on always share the user-supplied name.
 
     Either create a dataset (``true_objects`` + ``feature_list`` given, or a
     config carrying ``feature_list``) or load one via ``dataset_id``
@@ -103,9 +106,11 @@ def train(
         feature_list: Feature layers (required when creating the dataset).
         true_objects: True-object shapefile (dataset creation).
         false_objects: Optional false-object shapefile.
-        model_name: User-supplied model name (required); sanitized into the
-            model id as ``<name>_<timestamp>``.
-        dataset_id: Load an existing dataset instead of creating one.
+        model_name: User-supplied name (required); sanitized into the model
+            id as ``<name>_<timestamp>`` — and into the id of a dataset
+            created in the same run, so model and dataset share the name.
+        dataset_id: Load an existing dataset instead of creating one (then
+            no dataset is named after ``model_name``).
         test_area: Optional test-area polygon layer (e.g. a ``.gpkg`` file
             under ``DeepLearning/train_annotations/``); tiles whose footprint
             intersects it are excluded from dataset creation (the held-out
@@ -164,6 +169,13 @@ def train(
             }
         )
 
+    # One timestamp for the whole run: the model id and the id of a dataset
+    # created in the same run are the same ``<name>_<timestamp>`` (the
+    # dataset lives under DeepLearning/samples/, the model under
+    # DeepLearning/model/, so the shared id cannot collide).
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    mid = model_id(name, timestamp)
+
     if dataset_id is not None:
         dataset = load_dataset(layout, dataset_id)
     else:
@@ -179,6 +191,7 @@ def train(
             img_size=config.img_size,
             class_balanced=class_balanced,
             seed=config.seed,
+            dataset_id=mid,
         )
     if config.num_classes != dataset.num_classes:
         LOGGER.info(
@@ -222,8 +235,6 @@ def train(
         )
 
     data = _split(dataset, config, layout)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    mid = model_id(name, timestamp)
     model_dir = layout.model_dir(mid)
     model_dir.mkdir(parents=True, exist_ok=True)
 

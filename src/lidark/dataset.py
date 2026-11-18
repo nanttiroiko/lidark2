@@ -195,8 +195,12 @@ def create_dataset(
             windows per object; the largest class keeps
             ``samples_per_object``.
         seed: Seed for the window-placement RNG.
-        dataset_id: Dataset name; default is the original-style timestamp
-            (``%m%d%H%M%S``).
+        dataset_id: Dataset id (the directory name under
+            ``DeepLearning/samples/``). :func:`~lidark.train.train` passes
+            the model's ``<name>_<timestamp>`` so a dataset and the model
+            trained on it in the same run share the user-supplied name;
+            the default for standalone calls is a bare timestamp
+            (``%Y%m%d-%H%M%S``).
 
     Returns:
         The created :class:`Dataset`.
@@ -353,7 +357,7 @@ def create_dataset(
             f"{feature_list[0]} in {', '.join(areas)}"
         )
 
-    out_dir = dataset_dir(layout, dataset_id or datetime.now().strftime("%m%d%H%M%S"))
+    out_dir = dataset_dir(layout, dataset_id or datetime.now().strftime("%Y%m%d-%H%M%S"))
     out_dir.mkdir(parents=True, exist_ok=True)
     samples = np.lib.format.open_memmap(  # type: ignore[no-untyped-call]
         out_dir / SAMPLES_FILENAME,

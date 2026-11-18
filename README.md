@@ -1,10 +1,10 @@
 # LIDARK2
 
-LIDARK2 detects archaeological features (such as tar production kilns) from
+lidark detects archaeological features (such as tar production kilns) from
 airborne laser scanning data using a deep learning pipeline. It is the
 modernized implementation of the original
-[LIDARK](old_code/) script: LiDAR point clouds are processed into elevation
-and terrain models, a U-Net is trained to recognize the features, and
+[LIDARK](https://github.com/finnish-heritage-agency/LIDARK_U-NET) script: LiDAR point clouds are processed into elevation
+and terrain models, a model is trained to recognize the features, and
 trained models produce georeferenced detection polygons.
 
 ## Setup
@@ -37,7 +37,7 @@ not install the other stack's binaries into it:
 
 ```console
 conda create -n lidark -c conda-forge python=3.11 gdal python-pdal \
-    pytorch-gpu numpy scipy geopandas pyogrio shapely rasterio tqdm
+    pytorch-gpu torchvision numpy scipy geopandas pyogrio shapely rasterio tqdm
 conda activate lidark
 pip install -e . --no-deps
 python -c "import torch; print(torch.cuda.is_available())"
@@ -49,13 +49,16 @@ binary dependency as a wheel - a pip torch wheel next to the conda
 stack is exactly the mixing this route avoids. `gdalbuildvrt` comes
 with the conda GDAL package (the PyPI `gdal-utils` package is not
 needed), and conda-forge resolves the `pytorch-gpu` CUDA build matching
-the installed driver.
+the installed driver. `torchvision` (the Faster R-CNN / Mask R-CNN
+backends) is installed in the same command, so the solver picks the
+torchvision build matching the `pytorch` CUDA variant.
 
 Notes:
 
 - Use `pytorch-cpu` instead of `pytorch-gpu` on machines without an
-  NVIDIA GPU. For the newest GPU architectures (RTX 50xx, compute
-  capability 12.0), check that the resolved build contains `sm_120`
+  NVIDIA GPU (keep `torchvision` in the same command so the solver picks
+  the matching CPU variant). For the newest GPU architectures
+  (RTX 50xx, compute capability 12.0), check that the resolved build contains `sm_120`
   kernels - a build without them fails at the first GPU op with
   `cudaErrorNoKernelImageForDevice`.
 - lidark sets `KMP_DUPLICATE_LIB_OK=TRUE` itself (in
@@ -70,6 +73,24 @@ Notes:
 - An environment that already contains pip-installed torch or numpy
   next to the conda stack cannot be repaired reliably in place -
   `pip uninstall` the pip copies or recreate the environment.
+- If conda cannot install all packages into one environment, split the
+  work over two environments instead of mixing routes: a small **maps
+  env** for `create-map` (DTM, and TPI on the CPU path) with no PyTorch
+  packages -
+
+  ```console
+  conda create -n lidark-maps -c conda-forge gdal pdal numpy scipy
+      geopandas pyogrio shapely rasterio tqdm
+  conda activate lidark-maps
+  pip install -e . --no-deps
+  ```
+
+  - and the full ML env from the command above (with `pytorch-gpu
+  torchvision`) for `train`, `predict`, and `evaluate` - plus TPI with
+  `--gpu`, which imports torch. Both envs get the lidark package itself
+  via `pip install -e . --no-deps`; activate `lidark-maps` for
+  `create-map` and the ML env for everything else. Keeping each conda
+  solve small and fast makes setting up the environments easier.
 
 ### Pip route (Linux/WSL2 only)
 
@@ -86,24 +107,29 @@ Then create the environment and install lidark:
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-pip install "torch==2.14.1+cu126" --index-url https://download.pytorch.org/whl/cu126
+pip install "torch==2.14.1+cu126" "torchvision==0.29.1+cu126" --index-url https://download.pytorch.org/whl/cu126
 python -c "import torch; print(torch.cuda.is_available())"
 ```
 
-The base `pip install -e .` pulls the CPU torch wheel; to replace it
-with the GPU build, install the exact version with its `+cuXXX` local
-tag from a CUDA wheel index - use the index currently listed at
+The base `pip install -e .` pulls the CPU torch **and torchvision** wheels
+(both are core dependencies now, so the maskrcnn/fasterrcnn backends work
+out of the box); to replace them with the GPU builds, install the exact
+versions with their `+cuXXX` local tags from a CUDA wheel index - use the
+index currently listed at
 [pytorch.org](https://pytorch.org/get-started/locally/) for your driver's
-CUDA version. A bare `pip install torch --index-url ...` is a no-op here:
+CUDA version. torchvision's version must match torch's (torch 2.14.1 pairs
+with torchvision 0.29.1; the pairing table is on the same page). A bare
+`pip install torch --index-url ...` (or `torchvision`) is a no-op here:
 pip sees the already-installed CPU build as satisfying the requirement
 and keeps it. `pip index versions torch --index-url <index>` lists the
-available CUDA builds.
+available CUDA builds (likewise for `torchvision`).
 
 Notes:
 
 - For the newest GPU architectures (RTX 50xx, compute capability 12.0)
-  use a `cu128`-or-newer index instead - a `cu126` build has no `sm_120`
-  kernels and every GPU op fails with `cudaErrorNoKernelImageForDevice`.
+  use a `cu128`-or-newer index instead - the `cu126` builds have no
+  `sm_120` kernels and every GPU op fails with
+  `cudaErrorNoKernelImageForDevice`.
 - `gdal-utils` (installed with lidark) provides the `gdalbuildvrt`
   command the VRT mosaics are built with; it needs the GDAL Python
   bindings, so also run `pip install gdal` (it compiles against the
@@ -113,22 +139,13 @@ Notes:
 
 ### Optional extras
 
-Both extras exist in both routes - only the tool differs:
+The only optional extra is the dev
+tooling - only the tool differs between the routes:
 
-- torchvision (the Faster R-CNN and Mask R-CNN backends; torch itself
-  is a core dependency - U-Net, GPU TPI): conda route -
-  `conda install torchvision`; pip route - `pip install -e ".[torch]"`,
-  using the torchvision build from the same `--index-url` as the torch
-  build when training on the GPU.
 - dev tools (pytest, ruff, mypy): conda route -
   `conda install pytest ruff mypy pre-commit`; pip route -
   `pip install -e ".[dev]"`.
 
-This provides the `lidark` command. `train` and `predict` switch to the
-GPU automatically when torch finds one; `create-map --map-type TPI --gpu`
-selects the torch TPI path. On GPU, `train` and `predict` can be sped up
-further with `--mixed-precision` and `--jit-compile` (both off by
-default).
 
 ## Running the modules
 
@@ -161,7 +178,7 @@ lidark create-map --area Naljanka \
   2). Output tiles are clipped to the original tile bounds; gaps (no
   ground points, e.g. water) are nodata (`-9999`).
 - `TPI` - topographic position index computed from the DTM product.
-  `--buffer` is the TPI radius in metres (default 30)
+  `--buffer` is the TPI radius in metres (default 8)
   (output: `Lidar/<area>/02_TPI/radius_<buffer>/`). The TPI uses a circular
   filter of the given radius (full weight, half-weight soft edge ring).
   Nodata cells in the DTM are excluded from the TPI calculation and stay
@@ -225,7 +242,7 @@ labelled objects.
 lidark train --area Naljanka Kuivaniemi \
     --name tar_kilns_v1 \
     --true-objects Tar_kilns.shp --false-objects OtherFeatures.shp \
-    --raster-type 02_TPI/radius_20 02_TPI/radius_30 \
+    --raster-type 02_TPI/radius_20 02_TPI/radius_8 \
     --test-area Test_area.gpkg
 ```
 
@@ -276,14 +293,14 @@ The knobs:
 
 Three backends ship. `--backend unet` (default, torch) is the semantic
 segmentation of the original program. `--backend maskrcnn` trains a Mask
-R-CNN instance segmentation model instead (torchvision, requires
-`lidark[torch]`): instance targets come from the label class maps, and
+R-CNN instance segmentation model instead (torchvision, part of the
+default install): instance targets come from the label class maps, and
 training is validated with **mask mAP** — AP50 by default, or AP75 with
 `--mask-ap-iou 0.75` (the monitored checkpoint/early-stopping metric).
 Mask R-CNN predictions are per-instance polygons in the same output
 GeoPackage as the U-Net's, so `predict` and `evaluate` work unchanged.
 `--backend fasterrcnn` trains a Faster R-CNN object detection model
-(torchvision, requires `lidark[torch]`): the same instance targets become
+(torchvision, part of the default install): the same instance targets become
 bounding boxes, and training is validated with **box mAP@0.5**
 (PASCAL VOC) by default — or AP75 with `--det-ap-iou 0.75`. Each
 detection is one box polygon in the same output GeoPackage, so `predict`
@@ -293,13 +310,10 @@ A Mask R-CNN training run uses the same data and flags as the U-Net —
 only the backend (and optionally the mAP IoU threshold) differ:
 
 ```console
-pip install -e ".[torch]"  # torchvision for the maskrcnn backend
-# conda route instead: conda install torchvision (see Setup)
-
 lidark train --area Naljanka \
     --name tar_kilns_rcnn_v1 \
     --true-objects Tar_kilns.shp --false-objects OtherFeatures.shp \
-    --raster-type 02_TPI/radius_20 02_TPI/radius_30 \
+    --raster-type 02_TPI/radius_20 02_TPI/radius_8 \
     --backend maskrcnn --mask-ap-iou 0.75 --test-area Test_area.gpkg
 ```
 
@@ -312,7 +326,7 @@ default):
 lidark train --area Naljanka \
     --name tar_kilns_frcnn_v1 \
     --true-objects Tar_kilns.shp --false-objects OtherFeatures.shp \
-    --raster-type 02_TPI/radius_20 02_TPI/radius_30 \
+    --raster-type 02_TPI/radius_20 02_TPI/radius_8 \
     --backend fasterrcnn --test-area Test_area.gpkg
 ```
 
@@ -328,7 +342,7 @@ behavior exactly, so existing projects are unaffected.
 lidark train --area Naljanka \
     --name features_multiclass_v1 \
     --true-objects Features.shp \
-    --raster-type 02_TPI/radius_20 02_TPI/radius_30 \
+    --raster-type 02_TPI/radius_20 02_TPI/radius_8 \
     --class-names tar_kiln charcoal_pit \
     --class-weights 1.0 2.0 --balanced-sampling
 ```
@@ -371,7 +385,7 @@ model is a new entry under `DeepLearning/model/`, so a lineage such as
 lidark train --area Naljanka \
     --name tar_kilns_v2 \
     --true-objects Tar_kilns.shp --false-objects OtherFeatures.shp \
-    --raster-type 02_TPI/radius_20 02_TPI/radius_30 \
+    --raster-type 02_TPI/radius_20 02_TPI/radius_8 \
     --base-model tar_kilns_v1_20260101-120000 \
     --learning-rate 0.0001
 ```
@@ -407,7 +421,7 @@ from lidark.config import ModelConfig, ProjectLayout
 layout = ProjectLayout(project_folder="C:/project")
 train(layout, "Naljanka", model_name="tar_kilns_v2",
       true_objects="Tar_kilns.shp", false_objects="OtherFeatures.shp",
-      feature_list=["02_TPI/radius_20", "02_TPI/radius_30"],
+      feature_list=["02_TPI/radius_20", "02_TPI/radius_8"],
       model_config=ModelConfig(learning_rate=0.0001),
       base_model_id="tar_kilns_v1_20260101-120000")
 ```
